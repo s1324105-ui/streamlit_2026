@@ -6,11 +6,72 @@ st.set_page_config(
     layout="centered"
 )
 
+import base64
+
+def get_base64(file):
+    with open(file, "rb") as f:
+        return base64.b64encode(f.read()).decode()
+
+sunrise = get_base64("sekai.png")
+kami = get_base64("kami.jpg")
+
+# 背景
+st.markdown(
+    f"""
+    <style>
+
+    .stApp {{
+        background-image:
+            linear-gradient(
+                rgba(255,255,255,0.15),
+                rgba(255,255,255,0.15)
+            ),
+            url("data:image/jpeg;base64,{sunrise}"),
+            url("data:image/jpeg;base64,{kami}");
+
+        background-size:
+            cover,
+            70%,
+            cover;
+
+        background-position:
+            center,
+            center,
+            center;
+
+        background-repeat:
+            no-repeat,
+            no-repeat,
+            no-repeat;
+
+        background-attachment: fixed;
+    }}
+
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+# 半透明パネル
+st.markdown(
+    """
+    <style>
+
+    .block-container {
+        background: rgba(255,255,255,0.85);
+        padding: 2rem;
+        border-radius: 20px;
+    }
+
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 st.title("🍳 世界の朝食診断アプリ")
-st.caption("おすすめの世界の朝食を診断します！")
+st.caption("おすすめの世界の朝食を15の国から診断します！")
 
 # =========================
-# 朝食データ（変更なし）
+# 朝食データ
 # =========================
 
 breakfast_data = {
@@ -72,7 +133,7 @@ breakfast_data = {
     "コルネット・カプチーノ（イタリア）": {
         "color": "ピンク",
         "food": "パン",
-        "mood": "ゆっくり過ごしたい",
+        "mood": "甘いものが食べたい",
         "info": "甘いパンとコーヒーの組み合わせ。",
         "ingredients": "コルネット、エスプレッソ、牛乳",
         "time": 10,
@@ -109,7 +170,7 @@ breakfast_data = {
         "info": "シロップたっぷりで楽しみます。",
         "ingredients": "小麦粉、卵、牛乳、バター、シロップ",
         "time": 20,
-        "difficulty": "★★☆☆☆",
+        "difficulty": "★★★☆☆",
         "image": "ame.jpeg",
         "url": "https://delishkitchen.tv/recipes/171096799996543379"
     },
@@ -145,7 +206,40 @@ breakfast_data = {
         "difficulty": "★★★★☆",
         "image": "pr.jpeg",
         "url": "https://www.bras-de-chef.com/recipes/チチャロン"
-    }
+    },
+    "トースタ・ミスタ（ポルトガル）": {
+        "color": "レッド",
+        "mood": "さっぱり食べたい",
+        "food": "パン",
+        "info": "たっぷりのチーズとハムを挟んでトーストしたサンドイッチのこと。オレンジジュースと一緒にどうぞ",
+        "ingredients": "チーズ、ハム、トースト、オレンジジュース",
+        "time": 15,
+        "difficulty": "★☆☆☆☆",
+        "image": "poru.jpg",
+        "url": "https://www.marumitsu.jp/worldbreakfast/?id=62"
+    },
+    "ジョークとパートンコー（タイ）": {
+        "color": "レッド",
+        "mood": "さっぱり食べたい",
+        "food": "ごはん",
+        "info": "「ジョーク（โจ๊ก）」とはお米の粒がわからなくなるまで煮込んだおかゆのこと。中国式の甘くない揚げパン「パートンコー（ปาท่องโก๋）」も朝の定番。調味料と一緒にアレンジできる",
+        "ingredients": "米、パン、鶏肉、しょうが",
+        "time": 20,
+        "difficulty": "★★★☆☆",
+        "image": "tai.jpg",
+        "url": "https://www.marumitsu.jp/worldbreakfast/?id=24"
+    },
+    "ナシ・クニン（インドネシア）": {
+        "color": "レッド",
+        "mood": "ゆっくり過ごしたい",
+        "food": "ごはん",
+        "info": "「ナシ・クニン（nasi kuning）」とはターメリックとココナッツミルクで一緒に炊いたご飯のこと。おかずなどと一緒に食べるとよりしっかり食べられる",
+        "ingredients": "ターメリック、ココナッツミルク、米、（肉、卵、キュウリ）",
+        "time": 40,
+        "difficulty": "★★☆☆☆",
+        "image": "indne.jpg",
+        "url": "https://www.marumitsu.jp/worldbreakfast/?id=42"
+    },
 }
 
 # =========================
@@ -208,8 +302,29 @@ time_map = {
     "30分以内": 30,
     "40分以上": 999
 }
-
 selected_time = time_map[time_choice]
+
+difficulty_choice = st.selectbox(
+    "料理の難易度は？",
+    [
+        "★☆☆☆☆",
+        "★★☆☆☆",
+        "★★★☆☆",
+        "★★★★☆",
+        "★★★★★"
+    ]
+)
+difficulty_map = {
+    "★☆☆☆☆": 1,
+    "★★☆☆☆": 2,
+    "★★★☆☆": 3,
+    "★★★★☆": 4,
+    "★★★★★": 5
+}
+
+selected_difficulty = difficulty_map[difficulty_choice]
+
+
 
 # =========================
 # 診断
@@ -217,18 +332,33 @@ selected_time = time_map[time_choice]
 
 if st.button("診断する！"):
 
+    best_score = -1
     recommendation = None
 
     for breakfast, data in breakfast_data.items():
 
-        if (
-            data["food"] == favorite_food
-            and data["mood"] == morning_mood
-            and data["time"] <= selected_time
-        ):
-            recommendation = breakfast
-            break
+        score = 0
 
+        # 食べたいもの
+        if data["food"] == favorite_food:
+            score += 3
+
+        # 気分
+        if data["mood"] == morning_mood:
+            score += 3
+
+        # 時間
+        if data["time"] <= selected_time:
+            score += 2
+
+        # 難易度
+        if difficulty_map[data["difficulty"]] <= selected_difficulty:
+            score += 2
+
+        # 一番高得点の朝食を保存
+        if score > best_score:
+            best_score = score
+            recommendation = breakfast
     if recommendation:
 
         result = breakfast_data[recommendation]
